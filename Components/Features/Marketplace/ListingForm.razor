@@ -1,0 +1,44 @@
+@inject IJSRuntime JS
+<dialog @ref="dialog" class="listing-dialog" aria-labelledby="listing-title" @onkeydown="HandleKey">
+    <header><h2 id="listing-title">@(Item.Id == 0 ? "Give it a second campus life." : "Edit your listing.")</h2><button class="close" aria-label="Close dialog" @onclick="Cancel"><img src="images/figma/faf54.svg" alt="" /></button></header>
+    <p class="intro">A few details, a good photo, and you’re ready to loop it forward.</p>
+    <form @onsubmit="Save" @onsubmit:preventDefault>
+        <label>Item title <span>*</span><input autofocus required maxlength="100" placeholder="e.g. Calculus textbook" @bind="Item.Title" /></label>
+        <div class="two-columns"><label>Category <span>*</span><select required @bind="Item.Category"><option value="">Select a category</option>@foreach(var c in new[] { "Books", "Lab Essentials", "Electronics", "Uniforms", "Other" }) { <option>@c</option> }</select></label><label>Price (₱) <span>*</span><input type="number" min="0" max="9999999" step="1" required @bind="Item.Price" /></label></div>
+        <label>Condition <span>*</span><select required @bind="Item.Condition"><option>Good</option><option>Like New</option><option>Well Used</option></select></label>
+        <label>Description <span>*</span><textarea required maxlength="2000" placeholder="Tell your fellow students a little about your item…" @bind="Item.Description"></textarea></label>
+        <div class="photo-field"><label for="product-photo">Product photo <span>*</span></label><label class="upload" for="product-photo">@if (!string.IsNullOrEmpty(Item.Image)) { <img class="preview" src="@Item.Image" alt="Selected product photo" /> } else { <img src="images/figma/2ac8c.svg" alt="" /> }<div><b>@(string.IsNullOrEmpty(Item.Image) ? "Click to upload a product photo" : "Click to replace product photo")</b><small>JPG, PNG or WebP · up to 5 MB</small></div><InputFile id="product-photo" accept="image/jpeg,image/png,image/webp" OnChange="Upload" /></label></div>
+        <label>Preferred campus meetup location <span>*</span><input required maxlength="120" placeholder="e.g. Main Library entrance" @bind="Item.Location" /></label>
+        @if(error is not null) { <p class="error" role="alert">@error</p> }
+        <footer><button class="button" type="button" @onclick="Cancel">Cancel</button><button class="button primary" type="submit" disabled="@uploading"><img src="images/figma/4f965.svg" alt="" />@(uploading ? "Loading photo…" : "Save Listing")</button></footer>
+    </form>
+</dialog>
+@code {
+    [Parameter, EditorRequired] public Listing Item { get; set; } = default!;
+    [Parameter] public EventCallback<Listing> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    private ElementReference dialog;
+    private bool uploading;
+    private string? error;
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if(firstRender) await JS.InvokeVoidAsync("campusLoop.openDialog", dialog); }
+    private async Task Cancel() { await JS.InvokeVoidAsync("campusLoop.closeDialog", dialog); await OnCancel.InvokeAsync(); }
+    private async Task HandleKey(KeyboardEventArgs e) { if(e.Key == "Escape") await Cancel(); }
+    private async Task Save() {
+        if(uploading) return;
+        if (string.IsNullOrWhiteSpace(Item.Title) || string.IsNullOrWhiteSpace(Item.Description) || string.IsNullOrWhiteSpace(Item.Location) || string.IsNullOrEmpty(Item.Category) || string.IsNullOrEmpty(Item.Image)) { error = "Please complete every field and add a product photo."; return; }
+        Item.Title = Item.Title.Trim(); Item.Location = Item.Location.Trim();
+        await JS.InvokeVoidAsync("campusLoop.closeDialog", dialog); await OnSave.InvokeAsync(Item);
+    }
+    private async Task Upload(InputFileChangeEventArgs e) {
+        error = null; uploading = true;
+        try {
+            var file = e.File;
+            if(file.Size > 5 * 1024 * 1024 || !new[] { "image/jpeg", "image/png", "image/webp" }.Contains(file.ContentType)) { error = "Choose a JPG, PNG or WebP image no larger than 5 MB."; return; }
+            var resized = await file.RequestImageFileAsync(file.ContentType, 1200, 1200);
+            await using var stream = resized.OpenReadStream(5 * 1024 * 1024);
+            using var memory = new MemoryStream(); await stream.CopyToAsync(memory);
+            Item.Image = $"data:{resized.ContentType};base64,{Convert.ToBase64String(memory.ToArray())}";
+        } catch { error = "This photo couldn’t be loaded. Please choose another image."; }
+        finally { uploading = false; }
+    }
+}
