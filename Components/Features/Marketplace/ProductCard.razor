@@ -1,0 +1,20 @@
+<article class="product-card">
+    <a href="@($"/items/{Item.Id}")" class="product-link">
+        <div class="photo"><img src="@Item.Image" alt="@Item.Title" loading="lazy" /><span class="condition @ConditionClass">@Item.Condition</span>@if (Item.Sold) { <span class="sold">Sold</span> }</div>
+        <div class="details"><span class="category">@Item.Category</span><h3>@Item.Title</h3><strong>₱@Item.Price.ToString("N0")</strong><p class="location"><img src="images/figma/b4b72.svg" alt="" />@Item.Location</p></div>
+    </a>
+    <div class="seller"><span class="avatar" style="background:@AvatarColor">@Item.Initials</span><span>@Item.Seller</span><small>@(Item.Days == 0 ? "Just now" : $"{Item.Days}d ago")</small></div>
+    @if (Manage)
+    {
+        <div class="actions"><button @onclick="() => OnEdit.InvokeAsync(Item)"><img src="images/figma/08ff4.svg" alt="" />Edit</button><button @onclick="() => OnToggleSold.InvokeAsync(Item)"><img src="images/figma/eaac4.svg" alt="" />@(Item.Sold ? "Relist" : "Mark sold")</button><button class="delete" aria-label="Delete @Item.Title" @onclick="() => OnDelete.InvokeAsync(Item)"><img src="images/figma/43f69.svg" alt="" /></button></div>
+    }
+</article>
+@code {
+    [Parameter, EditorRequired] public Listing Item { get; set; } = default!;
+    [Parameter] public bool Manage { get; set; }
+    [Parameter] public EventCallback<Listing> OnEdit { get; set; }
+    [Parameter] public EventCallback<Listing> OnToggleSold { get; set; }
+    [Parameter] public EventCallback<Listing> OnDelete { get; set; }
+    private string ConditionClass => Item.Condition == "Like New" ? "like-new" : Item.Condition == "Well Used" ? "well-used" : "";
+    private string AvatarColor => Item.Seller is "Diego Ramos" or "Luis Torres" ? "#d9e7df" : Item.Seller is "Carlo Mendoza" or "Sofia Lim" ? "#d9dfcd" : "#e5d6c9";
+}
