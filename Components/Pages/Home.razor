@@ -1,0 +1,87 @@
+@page "/"
+@page "/{View}"
+@page "/items/{ItemId:int}"
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>@(IsMine ? "My Listings" : CurrentItem?.Title ?? "Marketplace") | CampusLoop</PageTitle>
+@if (!string.IsNullOrEmpty(notice)) { <div class="notice" role="status">@notice</div> }
+@if (View is not null && !IsMine)
+{
+    <div class="empty"><h1>Page not found</h1><a class="button" href="/">Back to marketplace</a></div>
+}
+else if (ItemId.HasValue)
+{
+    @if (CurrentItem is { } item)
+    {
+        <ItemDetails @key="item.Id" Item="item" />
+        <section class="related"><div class="section-title"><h2>More good finds</h2><a href="/">Back to marketplace ↗</a></div><div class="product-grid">@foreach(var related in RelatedItems) { <ProductCard Item="related" /> }</div></section>
+    }
+    else { <div class="empty"><h1>Item not found</h1><a class="button" href="/">Back to marketplace</a></div> }
+}
+else if (IsMine)
+{
+    <div class="listing-heading"><div><p class="eyebrow">YOUR LITTLE CAMPUS STOREFRONT</p><h1>My Listings</h1><p>Make room for what’s next. Manage your preloved finds here.</p></div><button class="button primary" @onclick="NewListing"><img src="images/figma/ff5fe.svg" alt="" />Add Listing</button></div>
+    <div class="stats">@foreach(var stat in new[] { ("Total Listings", Mine.Count(), "b41d6.svg"), ("Available", Mine.Count(x => !x.Sold), "5b015.svg"), ("Sold", Mine.Count(x => x.Sold), "25494.svg") }) { <div class="stat"><span><img src="@($"images/figma/{stat.Item3}")" alt="" /></span><div><p>@stat.Item1</p><strong>@stat.Item2</strong></div></div> }</div>
+    <div class="listing-tabs"><div>@foreach(var tab in new[] { "All", "Available", "Sold" }) { <button class="filter @(status == tab ? "selected" : "")" aria-pressed="@(status == tab)" @onclick="() => status = tab">@tab <small>@Mine.Count(x => tab == "All" || x.Sold == (tab == "Sold"))</small></button> }</div><span>A second life starts with your listing.</span></div>
+    <div class="product-grid">@foreach(var item in Mine.Where(x => status == "All" || x.Sold == (status == "Sold"))) { <ProductCard @key="item.Id" Item="item" Manage="true" OnEdit="EditListing" OnToggleSold="ToggleSold" OnDelete="RequestDelete" /> }</div>
+    @if (!Mine.Any(x => status == "All" || x.Sold == (status == "Sold"))) { <p class="empty">No listings here yet. Give something a second campus life.</p> }
+}
+else
+{
+    <MarketplaceHero />
+    <section aria-label="Browse marketplace" class="browse">
+        <div class="search-row"><label class="search"><img src="images/figma/64af6.svg" alt="" /><input @ref="searchInput" aria-label="Search marketplace" placeholder="Search books, lab coats, calculators…" @bind="search" @bind:event="oninput" /><button class="shortcut" aria-label="Focus search" @onclick="FocusSearch">/</button></label><span class="campus"><img src="images/figma/a0295.svg" alt="" />Luntian University <i></i></span></div>
+        <div class="filters"><div class="categories" aria-label="Filter by category">@for(var i = 0; i < Categories.Length; i++) { var name = Categories[i]; var icon = CategoryIcons[i]; <button class="filter @(category == name ? "selected" : "")" aria-pressed="@(category == name)" @onclick="() => category = name"><img src="@($"images/figma/{icon}")" alt="" />@name</button> }</div><label class="sort"><img src="images/figma/9f0f1.svg" alt="" /><select aria-label="Sort listings" @bind="sort"><option value="newest">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></label></div>
+        <div class="section-title"><h2>Fresh finds on campus <span>@Filtered.Count() items</span></h2><small>● Your next find is closer than you think</small></div>
+        <div class="product-grid">@foreach(var item in Filtered) { <ProductCard @key="item.Id" Item="item" /> }</div>
+        @if (!Filtered.Any()) { <div class="empty"><h2>No finds just yet.</h2><p>Try another search or category.</p><button class="button" @onclick="ClearFilters">Clear filters</button></div> }
+    </section>
+    <section class="sell-banner"><span class="leaf"><img src="images/figma/3adb1.svg" alt="" /></span><div><h2>Done with it? Someone on campus needs it.</h2><p>Free up some space, earn a little extra, and keep good things going.</p></div><button class="button" @onclick="NewListing">List your first item <span>↗</span></button></section>
+    <div class="trust"><span><img src="images/figma/8c397.svg" alt="" />A community you know</span><span><img src="images/figma/011ef.svg" alt="" />Easy on-campus meetups</span><span><img src="images/figma/7b351.svg" alt="" />Better for your budget &amp; the planet</span></div>
+}
+@if (editing is not null) { <ListingForm Item="editing" OnSave="SaveListing" OnCancel="CloseForm" /> }
+@if (deleting is not null)
+{
+    <dialog class="delete-dialog" @onkeydown="DeleteKey" aria-labelledby="delete-title" @ref="deleteDialog"><h2 id="delete-title">Delete this listing?</h2><p>Remove “@deleting.Title” from this demo?</p><div><button class="button" @onclick="CancelDelete">Cancel</button><button class="button danger" @onclick="DeleteListing">Delete listing</button></div></dialog>
+}
+@code {
+    [Parameter] public int? ItemId { get; set; }
+    [Parameter] public string? View { get; set; }
+    [SupplyParameterFromQuery(Name = "sell")] public bool Sell { get; set; }
+    private readonly List<Listing> listings = Listing.Samples();
+    private static readonly string[] Categories = ["All items", "Books", "Lab Essentials", "Electronics", "Uniforms", "Other"];
+    private static readonly string[] CategoryIcons = ["0979f.svg", "3f1b1.svg", "d402e.svg", "1e537.svg", "629a2.svg", "54fe8.svg"];
+    private string search = "", category = "All items", sort = "newest", status = "All", notice = "";
+    private Listing? editing, deleting;
+    private ElementReference searchInput, deleteDialog;
+    private bool previousSell, deleteOpened;
+    private bool IsMine => View == "my-listings";
+    private Listing? CurrentItem => listings.FirstOrDefault(x => x.Id == ItemId);
+    private IEnumerable<Listing> Mine => listings.Where(x => x.Seller == "Alex Reyes");
+    private IEnumerable<Listing> RelatedItems => new[] { 8, 10, 2, 3 }.Select(id => listings.FirstOrDefault(x => x.Id == id)).OfType<Listing>().Where(x => x.Id != ItemId && !x.Sold);
+    private IEnumerable<Listing> Filtered {
+        get {
+            var result = listings.Where(x => !x.Sold && (category == "All items" || x.Category == category) && (x.Title.Contains(search, StringComparison.OrdinalIgnoreCase) || x.Category.Contains(search, StringComparison.OrdinalIgnoreCase)));
+            return sort switch { "low" => result.OrderBy(x => x.Price), "high" => result.OrderByDescending(x => x.Price), _ => result.OrderByDescending(x => x.Id > 12).ThenBy(x => x.Id) };
+        }
+    }
+    protected override void OnParametersSet() { if (Sell && !previousSell) NewListing(); previousSell = Sell; }
+    private void NewListing() { editing = new Listing(); notice = ""; }
+    private void EditListing(Listing item) => editing = item.Copy();
+    private void CloseForm() { editing = null; if (Sell) Navigation.NavigateTo("/"); }
+    private void SaveListing(Listing item) {
+        var index = listings.FindIndex(x => x.Id == item.Id);
+        if (index >= 0) listings[index] = item; else { item.Id = listings.Max(x => x.Id) + 1; listings.Add(item); }
+        editing = null; notice = "Listing saved for this demo session. Changes reset when you reload.";
+        Navigation.NavigateTo("/my-listings");
+    }
+    private void ToggleSold(Listing item) { item.Sold = !item.Sold; notice = item.Sold ? "Listing marked sold." : "Listing is available again."; }
+    private void RequestDelete(Listing item) { deleting = item; deleteOpened = false; }
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if(deleting is not null && !deleteOpened) { deleteOpened = true; await JS.InvokeVoidAsync("campusLoop.openDialog", deleteDialog); } }
+    private async Task CancelDelete() { await JS.InvokeVoidAsync("campusLoop.closeDialog", deleteDialog); deleting = null; }
+    private async Task DeleteKey(KeyboardEventArgs e) { if(e.Key == "Escape") await CancelDelete(); }
+    private async Task DeleteListing() { listings.Remove(deleting!); await CancelDelete(); notice = "Listing deleted from this demo session."; }
+    private void ClearFilters() { search = ""; category = "All items"; }
+    private async Task FocusSearch() => await searchInput.FocusAsync();
+}
