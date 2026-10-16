@@ -1,0 +1,49 @@
+# .NET build and publish output
+[Bb]in/
+[Oo]bj/
+artifacts/
+publish/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Node dependencies and generated Tailwind stylesheet
+node_modules/
+/wwwroot/tailwind.css
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local IDE settings
+.vs/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+*.sln.iml
+
+# Local secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+!.env.*.example
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.p12
+*.publishsettings
+*.pubxml.user
+.aws/
+
+# Local agent state
+.codex/
+
+# OS and temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.swp
+*~
