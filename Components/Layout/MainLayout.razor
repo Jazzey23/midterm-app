@@ -1,0 +1,8 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+<header class="site-header"><div class="shell header-inner"><Brand /><nav aria-label="Main navigation"><a href="/" class="@(!IsMine ? "active" : "")" aria-current="@(!IsMine ? "page" : null)"><img src="@(IsMine ? "images/figma/f3a34.svg" : "images/figma/9522b.svg")" alt="" />Marketplace</a><NavLink href="/my-listings"><img src="@(IsMine ? "images/figma/42a35.svg" : "images/figma/42b79.svg")" alt="" />My Listings</NavLink></nav><div class="account"><a class="button primary" href="/?sell=true"><img src="images/figma/382db.svg" alt="" />Sell an Item</a><span class="divider"></span><div class="user"><span class="avatar">AR</span><span><b>Alex Reyes</b><small>Student</small></span></div></div></div></header>
+<main class="shell main-content">@Body</main>
+<footer class="site-footer"><div class="shell footer-inner"><Brand Small="true" /><span>Good things deserve another semester.</span><small>© 2026 CampusLoop · A student project. Made for the campus community.</small></div></footer>
+<div id="blazor-error-ui" data-nosnippet>An unexpected error occurred. <a href=".">Reload</a><button class="dismiss" aria-label="Dismiss error">Dismiss</button></div>
+
+@code { private bool IsMine => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("my-listings"); }
